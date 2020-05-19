@@ -1,15 +1,14 @@
 Text-BlockFormatter
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+The requirement for this module grew from my desire to create a module that
+formatted SQL. I've made a couple of false starts on that module (called
+SQL::Tidy, naturally), and I've now got something that sort of works, but the
+structure is a little unwieldy. What I finally realized today was that I needed
+to separate the formatting part of the problem into it's own module.
 
-A README file is required for CPAN modules since CPAN extracts the README
-file from a module distribution so that people browsing the archive
-can use it to get an idea of the module's uses. It is usually a good idea
-to provide version information here so that people can decide whether
-fixes for the module are worth downloading.
+Right now this just does the dead simple word wrapping task. There's only a
+single block, and no columns, but future updates will take care of that. This
+is Alpha code until I say otherwise.
 
 
 INSTALLATION
