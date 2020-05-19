@@ -19,7 +19,7 @@ use Text::BlockFormatter;
             'sed do eiusmod tempor incididunt',
             'ut labore et dolore magna aliqua.'
         );
-        $block->add( \@text );
+        $block->add( { text => \@text } );
 
         my $output = $block->output;
         ok( defined $output, 'Got some output' );

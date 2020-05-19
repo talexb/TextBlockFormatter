@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 use constant DEFAULT_WIDTH => 78;
+use constant DEFAULT_COLUMNS => 1;
 
 =head1 NAME
 
@@ -16,7 +17,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head1 SYNOPSIS
@@ -31,7 +32,7 @@ made up of lines.
         'sed do eiusmod tempor incididunt',
         'ut labore et dolore magna aliqua.'
     );
-    $block->add(0, \@text);
+    $block->add({text=>\@text});
 
     my $output = $block->output;
 
@@ -56,10 +57,23 @@ sub new
 {
     my ( $class, $args ) = @_;
 
+    #  The block has a default overall width. Within that, there can be one to
+    #  many columns. A column can be set not to wrap, such as the case for the
+    #  first column of an SQL command (SQL::Tidy, upon which this module
+    #  depends). In that case, we have to figure out the maximum width for that
+    #  column during the output phase, in order figure to out how much space is
+    #  left for the rest of the columns.
+
     my $self = {
-        width  => $args->{width} // DEFAULT_WIDTH,
-        output => [''],
+        width   => $args->{width}   // DEFAULT_WIDTH,
     };
+
+    if ( exists $args->{cols} ) {
+
+    } else {
+
+        $self->{output} = [ { wrap => 1, output => [''] } ];
+    }
 
     bless $self, $class;
     return $self
@@ -69,45 +83,66 @@ sub add
 {
     my ( $self, $data ) = @_;
 
-    foreach my $line ( @{$data} ) {
+    #  Default to the first column if none is specified.
+
+    my $col = exists $data->{col} ? $data->{col} : 0;
+
+    #  Stuff every word of every line into the selected column, and worry about
+    #  wrapping the text during the output stage.
+
+    foreach my $line ( @{$data->{text}} ) {
 
         foreach my $word ( split( /\s/, $line ) ) {
 
-            if ( length( $self->{output}->[-1] ) == 0 ) {
-
-                #  Line's empty .. just add the word.
-                #  TODO: For pathological cases, the word could be too long for
-                #  the line, in which case we might have to hyphenate.  Yikes.
-
-                $self->{output}->[-1] = $word;
-
-            } elsif (
-                length( $self->{output}->[-1] ) + 1 + length($word) <
-                $self->{width} )
-            {
-
-                #  Line has space for the word .. add the word, with an
-                #  intervening space.
-
-                $self->{output}->[-1] .= " $word";
-
-            } else {
-
-                #  There isn't space for the word. Create a new line, and re-do
-                #  the loop for this word.
-
-                push( @{ $self->{output} }, '' );
-                redo;
-            }
+            push ( @{ $self->{output}->[$col]->{output} }, $word );
         }
     }
 }
 
 sub output
 {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
-    return ( $self->{ output } );
+    #  For now, we're taking the shortcut of ignoring the wrap option, and just
+    #  capturing a single block's output. We're also usiing the block's width
+    #  in figuring out when to do a new line; for multiple columns, this will
+    #  have to be a multi-pass process in order to find out the maximum width
+    #  for the no wrap columns and then figure out how much space is left for
+    #  the remaining columns.
+
+    my @output = ('');
+    foreach my $col ( scalar @{ $self->{output} } ) {
+
+        foreach my $word ( @{ $self->{output}->[$col]->{output} } ) {
+
+            if ( length( $output[-1] ) == 0 ) {
+
+                #  Line's empty .. just add the word.
+                #  TODO: For pathological cases, the word could be too long for
+                #  the line, in which case we might have to hyphenate.  Yikes.
+
+                $output[-1] = $word;
+
+            } elsif (
+                length( $output[-1] ) + 1 + length($word) < $self->{width} )
+            {
+
+                #  Line has space for the word .. add the word, with an
+                #  intervening space.
+
+                $output[-1] .= " $word";
+
+            } else {
+
+                #  There isn't space for the word. Create a new line, and re-do
+                #  the loop for this word.
+
+                push( @output, '' );
+                redo;
+            }
+        }
+    }
+    return ( \@output );
 }
 
 =head1 AUTHOR
