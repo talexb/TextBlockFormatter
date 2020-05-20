@@ -110,39 +110,103 @@ sub output
     #  for the no wrap columns and then figure out how much space is left for
     #  the remaining columns.
 
-    my @output = ('');
-    foreach my $col ( scalar @{ $self->{output} } ) {
+    #  Build a list of lists of lines, capturing the maximum width of each
+    #  column. We start with the columns that have wrap disabled, then continue
+    #  with the rest of the columns, using the remaining available space. The
+    #  trivial case is where the first column is no wrap (for SQL::Tidy), and
+    #  the second column is normal. Currently this code doesn't handle more
+    #  than two columns.
 
-        foreach my $word ( @{ $self->{output}->[$col]->{output} } ) {
+    my @big_output;
+    my $space = $self->{width};    #  Initialize space.
 
-            if ( length( $output[-1] ) == 0 ) {
+  WRAP:
+    foreach my $wrap ( 0 .. 1 ) {
 
-                #  Line's empty .. just add the word.
-                #  TODO: For pathological cases, the word could be too long for
-                #  the line, in which case we might have to hyphenate.  Yikes.
+        foreach my $col (0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
-                $output[-1] = $word;
+            next WRAP if ( $self->{output}->[$col]->{wrap} == $wrap );
 
-            } elsif (
-                length( $output[-1] ) + 1 + length($word) < $self->{width} )
-            {
+            my @output     = ('');
+            my $max_length = 0;
 
-                #  Line has space for the word .. add the word, with an
-                #  intervening space.
+            foreach my $word ( @{ $self->{output}->[$col]->{output} } ) {
 
-                $output[-1] .= " $word";
+                if ( length( $output[-1] ) == 0 ) {
 
-            } else {
+                 #  Line's empty .. just add the word.
+                 #  TODO: For pathological cases, the word could be too long for
+                 #  the line, in which case we might have to hyphenate.  Yikes.
 
-                #  There isn't space for the word. Create a new line, and re-do
-                #  the loop for this word.
+                    $output[-1] = $word;
+                    $max_length = length $output[-1];
 
-                push( @output, '' );
-                redo;
+                } elsif ( $self->{output}->[$col]->{wrap} == 0
+                    || length( $output[-1] ) + 1 + length($word) < $space )
+                {
+
+                    #  Either we're doing no wrap, or the line has space for
+                    #  the word .. we add the word, with an intervening space.
+
+                    $output[-1] .= " $word";
+                    $max_length = length $output[-1];
+
+                } else {
+
+                 #  There isn't space for the word. Create a new line, and re-do
+                 #  the loop for this word.
+
+                    push( @output, '' );
+                    redo;
+                }
             }
+
+            #  Either we're doing no wrap -- in which case it's the maximum
+            #  length that we saw -- otherwise, it's what was left over.
+
+            my $fmt_length =
+              $self->{output}->[$col]->{wrap} ? $space : $max_length;
+            push( @big_output, { fmt => "%-${fmt_length}s", data => \@output } );
+
+            $space -= $max_length;
         }
     }
-    return ( \@output );
+
+    #  Now we need to count the number of lines in each of the parts, and
+    #  output the greater number of lines. This loop figures out which of the
+    #  groups is longest.
+
+    my $max_lines = 0;
+    foreach my $col (@big_output) {
+
+        if ( $max_lines < scalar @{$col->{data}} ) { $max_lines = scalar @{$col->{data}}; }
+    }
+
+    #  Build the final output, grabbing the relevant line from each group, and
+    #  truncating any trailing spaces.
+
+    my @final_output;
+    foreach my $line ( 0 .. $max_lines ) {
+
+        my @line;
+        foreach my $col ( 0 .. (scalar @{ $self->{output} })-1 ) {
+
+            push(
+                @line,
+                sprintf(
+                    $big_output[$col]->{fmt},
+                    $big_output[$col]->{data}->[$line] // ''
+                )
+            );
+        }
+        push( @final_output, join( ' ', @line ) );
+        $final_output[-1] =~ s/\s+$//;    #  Trim trailing spaces.
+    }
+
+    #  Clean up empty line at the end.
+    if ( $final_output[-1] eq '' ) { pop @final_output; }
+
+    return ( \@final_output );
 }
 
 =head1 AUTHOR
