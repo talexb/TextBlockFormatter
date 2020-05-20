@@ -70,6 +70,14 @@ sub new
 
     if ( exists $args->{cols} ) {
 
+        foreach my $col ( @{ $args->{cols} } ) {
+
+            push(
+                @{ $self->{output} },
+                { wrap => $col->{wrap} // 1, output => [''] }
+            );
+        }
+
     } else {
 
         $self->{output} = [ { wrap => 1, output => [''] } ];
@@ -120,12 +128,18 @@ sub output
     my @big_output;
     my $space = $self->{width};    #  Initialize space.
 
-  WRAP:
+    #  We're doing the no wrapping column first, and then the wrapping column,
+    #  since the wrapping column needs to know how much space is left.
+
     foreach my $wrap ( 0 .. 1 ) {
 
+      COL:
         foreach my $col (0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
-            next WRAP if ( $self->{output}->[$col]->{wrap} == $wrap );
+            #  Skip this time around the loop if we're not doing this kind of
+            #  wrap right now.
+
+            next if ( $self->{output}->[$col]->{wrap} != $wrap );
 
             my @output     = ('');
             my $max_length = 0;
@@ -134,9 +148,10 @@ sub output
 
                 if ( length( $output[-1] ) == 0 ) {
 
-                 #  Line's empty .. just add the word.
-                 #  TODO: For pathological cases, the word could be too long for
-                 #  the line, in which case we might have to hyphenate.  Yikes.
+                    #  Line's empty .. just add the word.
+                    #  TODO: For pathological cases, the word could be too long
+                    #  for the line, in which case we might have to hyphenate.
+                    #  Yikes.
 
                     $output[-1] = $word;
                     $max_length = length $output[-1];
@@ -153,8 +168,8 @@ sub output
 
                 } else {
 
-                 #  There isn't space for the word. Create a new line, and re-do
-                 #  the loop for this word.
+                    #  There isn't space for the word. Create a new line, and
+                    #  re-do the loop for this word.
 
                     push( @output, '' );
                     redo;
@@ -163,6 +178,7 @@ sub output
 
             #  Either we're doing no wrap -- in which case it's the maximum
             #  length that we saw -- otherwise, it's what was left over.
+            #  This means we're only dealing with two columns at a time.
 
             my $fmt_length =
               $self->{output}->[$col]->{wrap} ? $space : $max_length;
@@ -204,6 +220,7 @@ sub output
     }
 
     #  Clean up empty line at the end.
+
     if ( $final_output[-1] eq '' ) { pop @final_output; }
 
     return ( \@final_output );
