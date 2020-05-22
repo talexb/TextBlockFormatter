@@ -67,24 +67,44 @@ sub new
     my $self = {
         width   => $args->{width}   // DEFAULT_WIDTH,
     };
+    bless $self, $class;
 
     if ( exists $args->{cols} ) {
 
-        foreach my $col ( @{ $args->{cols} } ) {
+        $self->{cols} = $args->{cols};
+    }
+    $self->_add_output_row;
+
+    return $self
+}
+
+#  We need to add another level of indirection so that we have multiple blocks,
+#  each of which can have a fixed left block and a variable right block. These
+#  blocks need to be checked together, so that the width of the fixed left
+#  block can be determined before flowing the variable right block.
+
+sub _add_output_row
+{
+    my ( $self ) = @_;
+
+    my @output_row;
+
+    if ( exists $self->{cols} ) {
+
+        foreach my $col ( @{ $self->{cols} } ) {
 
             push(
-                @{ $self->{output} },
+                @output_row,
                 { wrap => $col->{wrap} // 1, output => [''] }
             );
         }
 
     } else {
 
-        $self->{output} = [ { wrap => 1, output => [''] } ];
+        @output_row = ( { wrap => 1, output => [''] } );
     }
 
-    bless $self, $class;
-    return $self
+    push ( @{ $self->{output} }, \@output_row );
 }
 
 sub add
@@ -102,7 +122,7 @@ sub add
 
         foreach my $word ( split( /\s/, $line ) ) {
 
-            push ( @{ $self->{output}->[$col]->{output} }, $word );
+            push ( @{ $self->{output}->[-1]->[$col]->{output} }, $word );
         }
     }
 }
@@ -134,17 +154,17 @@ sub output
     foreach my $wrap ( 0 .. 1 ) {
 
       COL:
-        foreach my $col (0 .. ( scalar @{ $self->{output} } ) - 1 ) {
+        foreach my $col (0 .. ( scalar @{ $self->{output}->[-1] } ) - 1 ) {
 
             #  Skip this time around the loop if we're not doing this kind of
             #  wrap right now.
 
-            next if ( $self->{output}->[$col]->{wrap} != $wrap );
+            next if ( $self->{output}->[-1]->[$col]->{wrap} != $wrap );
 
             my @output     = ('');
             my $max_length = 0;
 
-            foreach my $word ( @{ $self->{output}->[$col]->{output} } ) {
+            foreach my $word ( @{ $self->{output}->[-1]->[$col]->{output} } ) {
 
                 if ( length( $output[-1] ) == 0 ) {
 
@@ -156,7 +176,7 @@ sub output
                     $output[-1] = $word;
                     $max_length = length $output[-1];
 
-                } elsif ( $self->{output}->[$col]->{wrap} == 0
+                } elsif ( $self->{output}->[-1]->[$col]->{wrap} == 0
                     || length( $output[-1] ) + 1 + length($word) < $space )
                 {
 
@@ -181,7 +201,7 @@ sub output
             #  This means we're only dealing with two columns at a time.
 
             my $fmt_length =
-              $self->{output}->[$col]->{wrap} ? $space : $max_length;
+              $self->{output}->[-1]->[$col]->{wrap} ? $space : $max_length;
             push( @big_output, { fmt => "%-${fmt_length}s", data => \@output } );
 
             $space -= $max_length;
@@ -205,7 +225,7 @@ sub output
     foreach my $line ( 0 .. $max_lines ) {
 
         my @line;
-        foreach my $col ( 0 .. (scalar @{ $self->{output} })-1 ) {
+        foreach my $col ( 0 .. (scalar @{ $self->{output}->[-1] })-1 ) {
 
             push(
                 @line,
