@@ -7,6 +7,8 @@ use warnings;
 use constant DEFAULT_WIDTH => 78;
 use constant DEFAULT_COLUMNS => 1;
 
+use List::Util qw/max/;
+
 =head1 NAME
 
 Text::BlockFormatter - format text into blocks and columns
@@ -95,13 +97,13 @@ sub _add_output_row
 
             push(
                 @output_row,
-                { wrap => $col->{wrap} // 1, output => [''] }
+                { wrap => $col->{wrap} // 1, output => [] }
             );
         }
 
     } else {
 
-        @output_row = ( { wrap => 1, output => [''] } );
+        @output_row = ( { wrap => 1, output => [] } );
     }
 
     push ( @{ $self->{output} }, \@output_row );
@@ -148,63 +150,107 @@ sub output
     my @big_output;
     my $space = $self->{width};    #  Initialize space.
 
-    #  We're doing the no wrapping column first, and then the wrapping column,
-    #  since the wrapping column needs to know how much space is left.
+    #  We're doing the no wrapping column first (the left column), and then the
+    #  wrapping column (the right column), since the wrapping column needs to
+    #  know how much space is left after we've found the largest non-wrapping
+    #  column.
 
+    my $max_length = 0;
     foreach my $wrap ( 0 .. 1 ) {
 
-      COL:
-        foreach my $col (0 .. ( scalar @{ $self->{output}->[-1] } ) - 1 ) {
+        #  We're looking at each block (think of blocks stacked vertically).
 
-            #  Skip this time around the loop if we're not doing this kind of
-            #  wrap right now.
+        foreach my $block ( 0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
-            next if ( $self->{output}->[-1]->[$col]->{wrap} != $wrap );
+          COL:
+            foreach
+              my $col ( 0 .. ( scalar @{ $self->{output}->[$block] } ) - 1 )
+            {
 
-            my @output     = ('');
-            my $max_length = 0;
+                #  Skip this time around the loop if we're not doing this kind of
+                #  wrap right now.
 
-            foreach my $word ( @{ $self->{output}->[-1]->[$col]->{output} } ) {
+                next if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
 
-                if ( length( $output[-1] ) == 0 ) {
+                my @output     = ('');
 
-                    #  Line's empty .. just add the word.
-                    #  TODO: For pathological cases, the word could be too long
-                    #  for the line, in which case we might have to hyphenate.
-                    #  Yikes.
-
-                    $output[-1] = $word;
-                    $max_length = length $output[-1];
-
-                } elsif ( $self->{output}->[-1]->[$col]->{wrap} == 0
-                    || length( $output[-1] ) + 1 + length($word) < $space )
+                foreach
+                  my $word ( @{ $self->{output}->[$block]->[$col]->{output} } )
                 {
 
-                    #  Either we're doing no wrap, or the line has space for
-                    #  the word .. we add the word, with an intervening space.
+                    if ( length( $output[-1] ) == 0 ) {
 
-                    $output[-1] .= " $word";
-                    $max_length = length $output[-1];
+                        #  Line's empty .. just add the word.
+                        #  TODO: For pathological cases, the word could be too
+                        #  long for the line, in which case we might have to
+                        #  hyphenate.  Yikes.
 
-                } else {
+                        $output[-1] = $word;
+                        $max_length = max ( $max_length, length $output[-1] );
 
-                    #  There isn't space for the word. Create a new line, and
-                    #  re-do the loop for this word.
+                    } elsif ( $self->{output}->[$block]->[$col]->{wrap} == 0
+                        || length( $output[-1] ) + 1 + length($word) < $space )
+                    {
 
-                    push( @output, '' );
-                    redo;
+                        #  Either we're doing no wrap, or the line has space
+                        #  for the word .. we add the word, with an intervening
+                        #  space.
+
+                        $output[-1] .= " $word";
+                        $max_length = max ( $max_length, length $output[-1] );
+
+                    } else {
+
+                        #  There isn't space for the word. Create a new line,
+                        #  and re-do the loop for this word.
+
+                        push( @output, '' );
+                        redo;
+                    }
+                }
+
+                #  This code is skipped the first time through (for non-wrap
+                #  columns) since we don't yet know what the maximum width is.
+                #  The second time through, we're doing the wrapped columns,
+                #  and we know how much space there is left.
+
+                if ( $wrap == 1 ) {
+
+                    $big_output[ $block ][ $col ] =
+                        { fmt => "%-${space}s", data => \@output };
                 }
             }
+        }
 
-            #  Either we're doing no wrap -- in which case it's the maximum
-            #  length that we saw -- otherwise, it's what was left over.
-            #  This means we're only dealing with two columns at a time.
+        #  After the non-wrap section, we know what the maximum width is, and
+        #  we can now add the text to the big output array. This duplicates the
+        #  some of the logic from the loop above.
 
-            my $fmt_length =
-              $self->{output}->[-1]->[$col]->{wrap} ? $space : $max_length;
-            push( @big_output, { fmt => "%-${fmt_length}s", data => \@output } );
+        if ( $wrap == 0 ) {
 
             $space -= $max_length;
+
+            foreach my $block ( 0 .. ( scalar @{ $self->{output} } ) - 1 ) {
+
+                foreach
+                  my $col ( 0 .. ( scalar @{ $self->{output}->[$block] } ) - 1 )
+                {
+                    next
+                      if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
+
+                    #  This just hort-circuits the if statement above by
+                    #  putting all of the words in this section into a string.
+                    #  We then use the maximum length, figured out by going
+                    #  through all of the layers of non-wrapped columns, to
+                    #  format that string.
+
+                    my $text = join( ' ',
+                        @{ $self->{output}->[$block]->[$col]->{output} } );
+
+                    $big_output[ $block ][ $col ] =
+                        { fmt => "%-${max_length}s", data => [$text] };
+                }
+            }
         }
     }
 
@@ -212,31 +258,40 @@ sub output
     #  output the greater number of lines. This loop figures out which of the
     #  groups is longest.
 
-    my $max_lines = 0;
-    foreach my $col (@big_output) {
+    my @block_max;
+    foreach my $block (0 .. (scalar @big_output)-1 ) {
 
-        if ( $max_lines < scalar @{$col->{data}} ) { $max_lines = scalar @{$col->{data}}; }
+        $block_max[ $block ] = 0;
+        foreach my $col ( 0 .. ( scalar @{ $big_output[$block] } ) - 1 ) {
+
+            $block_max[$block] =
+              max( $block_max[$block],
+                scalar @{ $big_output[$block][$col]->{data} } );
+        }
     }
 
-    #  Build the final output, grabbing the relevant line from each group, and
-    #  truncating any trailing spaces.
+    #  Build the final output, grabbing the relevant line from each block, line
+    #  and column, and truncating any trailing spaces.
 
     my @final_output;
-    foreach my $line ( 0 .. $max_lines ) {
+    foreach my $block ( 0 .. ( scalar @big_output ) - 1 ) {
 
-        my @line;
-        foreach my $col ( 0 .. (scalar @{ $self->{output}->[-1] })-1 ) {
+        foreach my $line ( 0 .. $block_max[$block] ) {
 
-            push(
-                @line,
-                sprintf(
-                    $big_output[$col]->{fmt},
-                    $big_output[$col]->{data}->[$line] // ''
-                )
-            );
+            my @line;
+            foreach my $col ( 0 .. ( scalar @{ $big_output[$block] } ) - 1 ) {
+
+                push(
+                    @line,
+                    sprintf(
+                        $big_output[$block][$col]->{fmt},
+                        $big_output[$block][$col]->{data}->[$line] // ''
+                    )
+                );
+            }
+            push( @final_output, join( ' ', @line ) );
+            $final_output[-1] =~ s/\s+$//;    #  Trim trailing spaces.
         }
-        push( @final_output, join( ' ', @line ) );
-        $final_output[-1] =~ s/\s+$//;    #  Trim trailing spaces.
     }
 
     #  Clean up empty line at the end.
