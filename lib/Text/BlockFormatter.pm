@@ -90,9 +90,14 @@ sub new
 #  blocks need to be checked together, so that the width of the fixed left
 #  block can be determined before flowing the variable right block.
 
+#  In addition, justification defaults to L, but R justification is possible.
+#  The code will look for an R to do right justification, and any other value
+#  will fall back to left justification. It's possible to do centre
+#  justification, but I don't see that as useful right now.
+
 sub add_output_row
 {
-    my ( $self ) = @_;
+    my ($self) = @_;
 
     my @output_row;
 
@@ -102,16 +107,20 @@ sub add_output_row
 
             push(
                 @output_row,
-                { wrap => $col->{wrap} // 1, output => [] }
+                {
+                    wrap => $col->{wrap} // 1,
+                    just => $col->{just} // 'L',
+                    output => []
+                }
             );
         }
 
     } else {
 
-        @output_row = ( { wrap => 1, output => [] } );
+        @output_row = ( { wrap => 1, just => 'L', output => [] } );
     }
 
-    push ( @{ $self->{output} }, \@output_row );
+    push( @{ $self->{output} }, \@output_row );
 }
 
 sub add
@@ -232,8 +241,15 @@ sub output
 
                 if ( $wrap == 1 ) {
 
+                    #  Implement right justification here.
+
+                    my $fmt =
+                      $self->{output}->[$block]->[$col]->{just} eq 'R'
+                      ? "%${space}s"
+                      : "%-${space}s";
+
                     $big_output[ $block ][ $col ] =
-                        { fmt => "%-${space}s", data => \@output };
+                        { fmt => $fmt, data => \@output };
                 }
             }
         }
@@ -254,7 +270,7 @@ sub output
                     next
                       if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
 
-                    #  This just hort-circuits the if statement above by
+                    #  This just short-circuits the if statement above by
                     #  putting all of the words in this section into a string.
                     #  We then use the maximum length, figured out by going
                     #  through all of the layers of non-wrapped columns, to
@@ -263,8 +279,13 @@ sub output
                     my $text = join( ' ',
                         @{ $self->{output}->[$block]->[$col]->{output} } );
 
-                    $big_output[ $block ][ $col ] =
-                        { fmt => "%-${max_length}s", data => [$text] };
+                    my $fmt =
+                      $self->{output}->[$block]->[$col]->{just} eq 'R'
+                      ? "%${max_length}s"
+                      : "%-${max_length}s";
+
+                    $big_output[$block][$col] =
+                      { fmt => $fmt, data => [$text] };
                 }
             }
         }
