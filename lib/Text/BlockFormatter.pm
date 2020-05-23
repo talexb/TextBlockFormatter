@@ -60,11 +60,12 @@ sub new
     my ( $class, $args ) = @_;
 
     #  The block has a default overall width. Within that, there can be one to
-    #  many columns. A column can be set not to wrap, such as the case for the
-    #  first column of an SQL command (SQL::Tidy, upon which this module
-    #  depends). In that case, we have to figure out the maximum width for that
-    #  column during the output phase, in order figure to out how much space is
-    #  left for the rest of the columns.
+    #  many rows, each of which contains columns. A column can be set not to
+    #  wrap, such as the case for the first column of an SQL command
+    #  (SQL::Tidy, upon which this module depends). In that case, we have to
+    #  figure out the maximum width for each of the row's non-wrapping columns
+    #  during the output phase, in order figure to out how much space is left
+    #  for the rest of the columns.
 
     my $self = {
         width   => $args->{width}   // DEFAULT_WIDTH,
@@ -75,7 +76,11 @@ sub new
 
         $self->{cols} = $args->{cols};
     }
-    $self->_add_output_row;
+
+    #  This method creates the first output row, and more will be added as
+    #  necessary.
+
+    $self->add_output_row;
 
     return $self
 }
@@ -85,7 +90,7 @@ sub new
 #  blocks need to be checked together, so that the width of the fixed left
 #  block can be determined before flowing the variable right block.
 
-sub _add_output_row
+sub add_output_row
 {
     my ( $self ) = @_;
 
@@ -149,6 +154,17 @@ sub output
 
     my @big_output;
     my $space = $self->{width};    #  Initialize space.
+
+    #  We may have an empty row at the end .. let's delete that so as to avoid
+    #  problems later on.
+
+    my $empty_row = 1;
+    foreach my $row ( @{ $self->{output}->[-1] } ) {
+
+        if ( scalar @{ $row->{output} } ) { $empty_row = 0; last; }
+    }
+
+    if ( $empty_row ) { pop @{ $self->{output} }; }
 
     #  We're doing the no wrapping column first (the left column), and then the
     #  wrapping column (the right column), since the wrapping column needs to
@@ -276,7 +292,7 @@ sub output
     my @final_output;
     foreach my $block ( 0 .. ( scalar @big_output ) - 1 ) {
 
-        foreach my $line ( 0 .. $block_max[$block] ) {
+        foreach my $line ( 0 .. $block_max[$block] - 1 ) {
 
             my @line;
             foreach my $col ( 0 .. ( scalar @{ $big_output[$block] } ) - 1 ) {
