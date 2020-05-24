@@ -97,7 +97,7 @@ sub new
 
 sub add_output_row
 {
-    my ($self) = @_;
+    my ($self, $args) = @_;
 
     my @output_row;
 
@@ -108,8 +108,9 @@ sub add_output_row
             push(
                 @output_row,
                 {
-                    wrap => $col->{wrap} // 1,
-                    just => $col->{just} // 'L',
+                    wrap   => $col->{wrap} // 1,
+                    just   => $col->{just} // 'L',
+                    indent => '',
                     output => []
                 }
             );
@@ -117,7 +118,13 @@ sub add_output_row
 
     } else {
 
-        @output_row = ( { wrap => 1, just => 'L', output => [] } );
+        @output_row = ( {
+                wrap   => 1,
+                just   => 'L',
+                indent => $args->{indent} // '',
+                output => []
+            }
+        );
     }
 
     push( @{ $self->{output} }, \@output_row );
@@ -162,7 +169,7 @@ sub output
     #  than two columns.
 
     my @big_output;
-    my $space = $self->{width};    #  Initialize space.
+    my $block_space = $self->{width};    #  Initialize space.
 
     #  We may have an empty row at the end .. let's delete that so as to avoid
     #  problems later on.
@@ -197,7 +204,9 @@ sub output
 
                 next if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
 
-                my @output     = ('');
+                my @output = ('');
+                my $space  = $block_space -
+                  length( $self->{output}->[$block]->[$col]->{indent} );
 
                 foreach
                   my $word ( @{ $self->{output}->[$block]->[$col]->{output} } )
@@ -210,7 +219,8 @@ sub output
                         #  long for the line, in which case we might have to
                         #  hyphenate.  Yikes.
 
-                        $output[-1] = $word;
+                        $output[-1] =
+                          $self->{output}->[$block]->[$col]->{indent} . $word;
                         $max_length = max ( $max_length, length $output[-1] );
 
                     } elsif ( $self->{output}->[$block]->[$col]->{wrap} == 0
@@ -260,7 +270,7 @@ sub output
 
         if ( $wrap == 0 ) {
 
-            $space -= $max_length;
+            $block_space -= $max_length;
 
             foreach my $block ( 0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
