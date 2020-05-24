@@ -24,8 +24,9 @@ our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
-This module formats text into blocks, which are built from columns, which are
-made up of lines.
+The impetus for this module is a desire to format SQL tidily.  This module
+formats text (words and punctuation, separated by spaces) into blocks,
+performing word wrapping when the input text overflows the block width.
 
     my $block = Text::BlockFormatter->new();
     my @text = (
@@ -38,12 +39,85 @@ made up of lines.
 
     my $output = $block->output;
 
-    #  $output contains
-    #
-    #  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-    #  tempor incididunt ut labore et dolore magna aliqua.
+This produces:
 
-More examples to come.
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+    tempor incididunt ut labore et dolore magna aliqua.
+
+The block width defaults to 78, but can be set to any size.
+
+    my $block = Text::BlockFormatter->new( { width => $width } );
+
+A block normally contains a single column, but we can also specify two columns.
+In this example, the first is set to not wrap.
+
+    my $block = Text::BlockFormatter->new(
+      { cols => [ { wrap => 0 }, { wrap => 1 } ] } );
+
+    my $title = 'Some Latin text';
+    $block->add( { col => 0, text => [ $title ]  } );
+    my @text = (
+        'Lorem ipsum dolor sit amet,',
+        'consectetur adipiscing elit,',
+        'sed do eiusmod tempor incididunt',
+        'ut labore et dolore magna aliqua.'
+    );
+    $block->add( { col => 1, text => \@text } );
+
+    my $output = $block->output;
+
+This produces:
+
+    Some Latin text Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
+                    do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+
+We can also set a block's justification to be right, instead of the default
+left setting.  This allows us to format the SQL statement
+
+    select foo, bar, baz from boobar
+    where quux < 5 and wazoo = "xx" order by foo desc, bar
+
+using
+
+    my $block = Text::BlockFormatter->new(
+        { cols => [ { wrap => 0 }, { wrap => 1 } ], width => $width } );
+
+to get the output:
+
+      select foo, bar, baz
+        from boobar
+       where quux < 5 and wazoo = "xx"
+    order by foo desc, bar
+
+This gives us a gutter with the keywords on the left (and right-justified) and
+with the rest of the lines on the right (and left-justified). The gutter is
+currently fixed at a single space.
+
+The staggered format is also possible using this module, by specifying the
+indent string to be used with a block. First, a regular, non-indented block is
+specified for text from the first column:
+
+    my $block = Text::BlockFormatter->new();
+    $block->add( { text => [ $row->{left} ] } );
+
+Then we add an output row with an indent, and add the text from the second
+column:
+
+    $block->add_output_row ( { indent => $indent } );
+    $block->add( { text => [ $row->{right} ] } );
+
+This produces the output:
+
+    select
+        foo, bar, baz
+    from
+        boobar
+    where
+        quux < 5 and wazoo = "xx"
+    order by
+        foo desc, bar
+
+These examples are taken from the test suite.
 
 =head1 EXPORT
 
@@ -51,7 +125,21 @@ TBA
 
 =head1 SUBROUTINES/METHODS
 
-=head2 new
+=head2 C<new>
+
+Create a block object.
+
+=head2 C<add_output_row>
+
+Add an output row.
+
+=head2 C<add>
+
+Add text to the block object.
+
+=head2 C<output>
+
+Output all of the text.
 
 =cut
 
