@@ -49,7 +49,7 @@ The block width defaults to 78, but can be set to any size.
     my $block = Text::BlockFormatter->new( { width => $width } );
 
 A block normally contains a single column, but we can also specify two columns.
-In this example, the first is set to not wrap.
+In this example, the first column is set to not wrap.
 
     my $block = Text::BlockFormatter->new(
       { cols => [ { wrap => 0 }, { wrap => 1 } ] } );
@@ -75,12 +75,21 @@ We can also set a block's justification to be right, instead of the default
 left setting.  This allows us to format the SQL statement
 
     select foo, bar, baz from boobar
-    where quux < 5 and wazoo = "xx" order by foo desc, bar
+    where quux < 5 and wazoo = "xx"
+    order by foo desc, bar
 
 using
 
     my $block = Text::BlockFormatter->new(
         { cols => [ { wrap => 0 }, { wrap => 1 } ], width => $width } );
+
+and specifying the following blocks and columns:
+
+    block   col 0       col 1
+      0     select      foo, bar
+      1     from        boobar
+      2     where       quux < 5 and wazoo = "xx"
+      3     order by    foo desc, bar
 
 to get the output:
 
