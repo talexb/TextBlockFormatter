@@ -112,7 +112,7 @@ specified for text from the first column:
 Then we add an output row with an indent, and add the text from the second
 column:
 
-    $block->add_output_row ( { indent => $indent } );
+    $block->add_row ( { indent => $indent } );
     $block->add( { text => [ $row->{right} ] } );
 
 This produces the output:
@@ -138,7 +138,7 @@ TBA
 
 Create a block object.
 
-=head2 C<add_output_row>
+=head2 C<add_row>
 
 Add an output row.
 
@@ -178,7 +178,7 @@ sub new
     #  column specification, or the default specification. More rows can be
     #  added as necessary.
 
-    $self->add_output_row;
+    $self->add_row;
 
     return $self
 }
@@ -193,11 +193,11 @@ sub new
 #  will fall back to left justification. It's possible to do centre
 #  justification, but I don't see that as useful right now.
 
-sub add_output_row
+sub add_row
 {
     my ($self, $args) = @_;
 
-    my @output_row;
+    my @row;
 
     if ( exists $self->{cols} ) {
 
@@ -207,7 +207,7 @@ sub add_output_row
         foreach my $col ( @{ $self->{cols} } ) {
 
             push(
-                @output_row,
+                @row,
                 {
                     wrap   => $col->{wrap} // 1,
                     just   => $col->{just} // 'L',
@@ -221,7 +221,7 @@ sub add_output_row
 
         #  This uses the default column specification for the output row.
 
-        @output_row = ( {
+        @row = ( {
                 wrap   => 1,
                 just   => 'L',
                 indent => $args->{indent} // '',
@@ -230,7 +230,7 @@ sub add_output_row
         );
     }
 
-    push( @{ $self->{output} }, \@output_row );
+    push( @{ $self->{output} }, \@row );
 }
 
 #  Add text to the specified column; defaults to adding text to the first

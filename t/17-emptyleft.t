@@ -20,7 +20,7 @@ use Text::BlockFormatter;
         'ut labore et dolore magna aliqua.'
     );
     $block->add( { col => 1, text => \@text } );
-    $block->add_output_row;
+    $block->add_row;
 
     $block->add( { col => 1, text => \@text } );
 

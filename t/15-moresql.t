@@ -49,7 +49,7 @@ use Text::BlockFormatter;
 
             $block->add( { col => 0, text => [ $row->{left} ] } );
             $block->add( { col => 1, text => [ $row->{right} ] } );
-            $block->add_output_row;
+            $block->add_row;
 
             $max = max( length( $row->{left} ), $max );
         }

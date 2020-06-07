@@ -39,9 +39,9 @@ use Text::BlockFormatter;
         foreach my $row (@sql) {
 
             $block->add( { text => [ $row->{left} ] } );
-            $block->add_output_row ( { indent => $indent } );
+            $block->add_row ( { indent => $indent } );
             $block->add( { text => [ $row->{right} ] } );
-            $block->add_output_row;
+            $block->add_row;
         }
 
         my $output = $block->output;
