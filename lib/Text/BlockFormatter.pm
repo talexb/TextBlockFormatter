@@ -212,7 +212,7 @@ sub add_row
                     wrap   => $col->{wrap} // 1,
                     just   => $col->{just} // 'L',
                     indent => '',
-                    output => []
+                    buffer => []
                 }
             );
         }
@@ -225,7 +225,7 @@ sub add_row
                 wrap   => 1,
                 just   => 'L',
                 indent => $args->{indent} // '',
-                output => []
+                buffer => []
             }
         );
     }
@@ -251,7 +251,7 @@ sub add
 
         foreach my $word ( split( /\s/, $line ) ) {
 
-            push ( @{ $self->{output}->[-1]->[$col]->{output} }, $word );
+            push ( @{ $self->{output}->[-1]->[$col]->{buffer} }, $word );
         }
     }
 }
@@ -286,7 +286,7 @@ sub output
     my $empty_row = 1;
     foreach my $row ( @{ $self->{output}->[-1] } ) {
 
-        if ( scalar @{ $row->{output} } ) { $empty_row = 0; last; }
+        if ( scalar @{ $row->{buffer} } ) { $empty_row = 0; last; }
     }
 
     if ( $empty_row ) { pop @{ $self->{output} }; }
@@ -326,7 +326,7 @@ sub output
                   length( $self->{output}->[$block]->[$col]->{indent} );
 
                 foreach
-                  my $word ( @{ $self->{output}->[$block]->[$col]->{output} } )
+                  my $word ( @{ $self->{output}->[$block]->[$col]->{buffer} } )
                 {
 
                     if ( length( $output[-1] ) == 0 ) {
@@ -404,7 +404,7 @@ sub output
                     #  format that string.
 
                     my $text = join( ' ',
-                        @{ $self->{output}->[$block]->[$col]->{output} } );
+                        @{ $self->{output}->[$block]->[$col]->{buffer} } );
 
                     my $fmt =
                       $self->{output}->[$block]->[$col]->{just} eq 'R'
