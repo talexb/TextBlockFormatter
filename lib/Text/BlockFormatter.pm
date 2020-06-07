@@ -8,6 +8,7 @@ use constant DEFAULT_WIDTH => 78;
 use constant DEFAULT_COLUMNS => 1;
 
 use List::Util qw/max/;
+use Log::Log4perl;
 
 =head1 NAME
 
@@ -180,6 +181,13 @@ sub new
 
     $self->add_row;
 
+    #  Logging.
+
+    Log::Log4perl->init ( './Text-BlockFormat.conf' );
+    my $log = Log::Log4perl->get_logger();
+
+    $log->info ( 'Create object' );
+
     return $self
 }
 
@@ -296,8 +304,6 @@ sub output
     #  columns? (Hmm .. there should be) 2a. Run through the output rows for
     #  those columns and get the maximum width, then 2b. run through the other
     #  columns.
-    #
-    #  TODO: The name output is a mis-nomer. It should probably be 'buffer'.
 
     #  We're doing the no wrapping column first (the left column), and then the
     #  wrapping column (the right column), since the wrapping column needs to
