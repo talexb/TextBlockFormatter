@@ -174,8 +174,9 @@ sub new
         $self->{cols} = $args->{cols};
     }
 
-    #  This method creates the first output row, and more will be added as
-    #  necessary.
+    #  This method creates the first output row using either the provided
+    #  column specification, or the default specification. More rows can be
+    #  added as necessary.
 
     $self->add_output_row;
 
@@ -200,6 +201,9 @@ sub add_output_row
 
     if ( exists $self->{cols} ) {
 
+        #  This copies the column specification of one or more columns into the
+        #  new output row.
+
         foreach my $col ( @{ $self->{cols} } ) {
 
             push(
@@ -215,6 +219,8 @@ sub add_output_row
 
     } else {
 
+        #  This uses the default column specification for the output row.
+
         @output_row = ( {
                 wrap   => 1,
                 just   => 'L',
@@ -226,6 +232,9 @@ sub add_output_row
 
     push( @{ $self->{output} }, \@output_row );
 }
+
+#  Add text to the specified column; defaults to adding text to the first
+#  column.
 
 sub add
 {
@@ -246,6 +255,9 @@ sub add
         }
     }
 }
+
+#  This combines the rows of columns into a single list of output strings that
+#  use a common structure.
 
 sub output
 {
@@ -268,8 +280,8 @@ sub output
     my @big_output;
     my $block_space = $self->{width};    #  Initialize space.
 
-    #  We may have an empty row at the end .. let's delete that so as to avoid
-    #  problems later on.
+    #  We may have an empty output row at the end of the last block .. if so,
+    #  let's delete that, so as to avoid blank lines later on.
 
     my $empty_row = 1;
     foreach my $row ( @{ $self->{output}->[-1] } ) {
@@ -278,6 +290,14 @@ sub output
     }
 
     if ( $empty_row ) { pop @{ $self->{output} }; }
+
+    #  TODO: The goal for this code re-work is to implement the following
+    #  logic. 1. A single column? Trivial case, do that. 2. Are there no wrap
+    #  columns? (Hmm .. there should be) 2a. Run through the output rows for
+    #  those columns and get the maximum width, then 2b. run through the other
+    #  columns.
+    #
+    #  TODO: The name output is a mis-nomer. It should probably be 'buffer'.
 
     #  We're doing the no wrapping column first (the left column), and then the
     #  wrapping column (the right column), since the wrapping column needs to
