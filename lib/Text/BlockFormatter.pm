@@ -205,6 +205,7 @@ sub add_row
 {
     my ($self, $args) = @_;
 
+    my $log = Log::Log4perl->get_logger();
     my @row;
 
     if ( exists $self->{cols} ) {
@@ -217,12 +218,14 @@ sub add_row
             push(
                 @row,
                 {
-                    wrap   => $col->{wrap} // 1,
-                    just   => $col->{just} // 'L',
+                    wrap => $col->{wrap} // 1,
+                    just => $col->{just} // 'L',
                     indent => '',
                     buffer => []
                 }
             );
+            $log->debug(
+                "Add row with wrap: $row[-1]->{wrap}, just: $row[-1]->{just}");
         }
 
     } else {
@@ -236,6 +239,8 @@ sub add_row
                 buffer => []
             }
         );
+        $log->debug( "Add default row with wrap: "
+              . "$row[-1]->{wrap}, just: $row[-1]->{just}" );
     }
 
     push( @{ $self->{output} }, \@row );
@@ -247,10 +252,12 @@ sub add_row
 sub add
 {
     my ( $self, $data ) = @_;
+    my $log = Log::Log4perl->get_logger();
 
     #  Default to the first column if none is specified.
 
     my $col = exists $data->{col} ? $data->{col} : 0;
+    $log->debug ( "Add text to column $col" );
 
     #  Stuff every word of every line into the selected column, and worry about
     #  wrapping the text during the output stage.
@@ -270,6 +277,7 @@ sub add
 sub output
 {
     my ($self) = @_;
+    my $log = Log::Log4perl->get_logger();
 
     #  For now, we're taking the shortcut of ignoring the wrap option, and just
     #  capturing a single block's output. We're also usiing the block's width
@@ -297,7 +305,10 @@ sub output
         if ( scalar @{ $row->{buffer} } ) { $empty_row = 0; last; }
     }
 
-    if ( $empty_row ) { pop @{ $self->{output} }; }
+    if ( $empty_row ) {
+        pop @{ $self->{output} };
+        $log->debug ( "Empty row detected and removed" );
+    }
 
     #  TODO: The goal for this code re-work is to implement the following
     #  logic. 1. A single column? Trivial case, do that. 2. Are there no wrap
@@ -313,19 +324,22 @@ sub output
     my $max_length = 0;
     foreach my $wrap ( 0 .. 1 ) {
 
+        $log->debug ( "Checking, wrap: $wrap" );
         #  We're looking at each block (think of blocks stacked vertically).
 
         foreach my $block ( 0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
+          $log->debug ( "--> Checking block $block" );
           COL:
             foreach
               my $col ( 0 .. ( scalar @{ $self->{output}->[$block] } ) - 1 )
             {
-
                 #  Skip this time around the loop if we're not doing this kind of
                 #  wrap right now.
 
                 next if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
+
+                $log->debug ( "----> Checking column $col" );
 
                 my @output = ('');
                 my $space  = $block_space -
@@ -334,6 +348,8 @@ sub output
                 foreach
                   my $word ( @{ $self->{output}->[$block]->[$col]->{buffer} } )
                 {
+
+                    $log->debug ( "------> Add $word .." );
 
                     if ( length( $output[-1] ) == 0 ) {
 
@@ -346,6 +362,8 @@ sub output
                           $self->{output}->[$block]->[$col]->{indent} . $word;
                         $max_length = max ( $max_length, length $output[-1] );
 
+                        # $log->debug ( "------> Empty line, max_length now $max_length" );
+
                     } elsif ( $self->{output}->[$block]->[$col]->{wrap} == 0
                         || length( $output[-1] ) + 1 + length($word) < $space )
                     {
@@ -357,12 +375,16 @@ sub output
                         $output[-1] .= " $word";
                         $max_length = max ( $max_length, length $output[-1] );
 
+                        # $log->debug ( "------> Non-empty line, max_length now $max_length" );
+
                     } else {
 
                         #  There isn't space for the word. Create a new line,
                         #  and re-do the loop for this word.
 
+                        $log->debug ( "------> No space (line is '$output[-1]'), re-doing loop" );
                         push( @output, '' );
+
                         redo;
                     }
                 }
@@ -373,6 +395,8 @@ sub output
                 #  and we know how much space there is left.
 
                 if ( $wrap == 1 ) {
+
+                    $log->debug ( "------> Wrap, adding output" );
 
                     #  Implement right justification here.
 
@@ -393,15 +417,19 @@ sub output
 
         if ( $wrap == 0 ) {
 
+            $log->debug ( "--> No wrap" );
             $block_space -= $max_length;
 
             foreach my $block ( 0 .. ( scalar @{ $self->{output} } ) - 1 ) {
 
+                $log->debug ( "----> Checking block $block" );
                 foreach
                   my $col ( 0 .. ( scalar @{ $self->{output}->[$block] } ) - 1 )
                 {
                     next
                       if ( $self->{output}->[$block]->[$col]->{wrap} != $wrap );
+
+                    $log->debug ( "------> Column $col" );
 
                     #  This just short-circuits the if statement above by
                     #  putting all of the words in this section into a string.
@@ -416,6 +444,8 @@ sub output
                       $self->{output}->[$block]->[$col]->{just} eq 'R'
                       ? "%${max_length}s"
                       : "%-${max_length}s";
+
+                    $log->debug ( "------> No wrap, adding output" );
 
                     $big_output[$block][$col] =
                       { fmt => $fmt, data => [$text] };
@@ -439,6 +469,7 @@ sub output
                 scalar @{ $big_output[$block][$col]->{data} } );
         }
     }
+    $log->debug ( "block_max is " . join('/', @block_max) );
 
     #  Build the final output, grabbing the relevant line from each block, line
     #  and column, and truncating any trailing spaces.
@@ -446,11 +477,14 @@ sub output
     my @final_output;
     foreach my $block ( 0 .. ( scalar @big_output ) - 1 ) {
 
+        $log->debug ( "Collect block $block" );
         foreach my $line ( 0 .. $block_max[$block] - 1 ) {
 
+            $log->debug ( "--> Collect line $line" );
             my @line;
             foreach my $col ( 0 .. ( scalar @{ $big_output[$block] } ) - 1 ) {
 
+                $log->debug ( "----> Collect column $col" ) ;
                 push(
                     @line,
                     sprintf(
@@ -461,6 +495,8 @@ sub output
             }
             push( @final_output, join( ' ', @line ) );
             $final_output[-1] =~ s/\s+$//;    #  Trim trailing spaces.
+
+            $log->debug ( "Line built is '$final_output[-1]'" );
         }
     }
 
