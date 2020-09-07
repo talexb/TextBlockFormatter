@@ -82,7 +82,8 @@ left setting.  This allows us to format the SQL statement
 using
 
     my $block = Text::BlockFormatter->new(
-        { cols => [ { wrap => 0 }, { wrap => 1 } ], width => $width } );
+        { cols => [ { wrap => 0, just => 'R' },
+                    { wrap => 1 } ], width => $width } );
 
 and specifying the following blocks and columns:
 
