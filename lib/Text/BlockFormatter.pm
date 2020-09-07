@@ -175,18 +175,18 @@ sub new
         $self->{cols} = $args->{cols};
     }
 
-    #  This method creates the first output row using either the provided
-    #  column specification, or the default specification. More rows can be
-    #  added as necessary.
-
-    $self->add_row;
-
-    #  Logging.
+    #  Initialize logging.
 
     Log::Log4perl->init ( './Text-BlockFormat.conf' );
     my $log = Log::Log4perl->get_logger();
 
     $log->info ( 'Create object' );
+
+    #  This method creates the first output row using either the provided
+    #  column specification, or the default specification. More rows can be
+    #  added as necessary.
+
+    $self->add_row;
 
     return $self
 }
